@@ -34,6 +34,8 @@
 ; 
 ; Special thanks to GUAN DE DIO and marciano
 ;
+; Hyperlink stuffs from: http://members.a1.net/ranmasaotome/masm32/Hyperlink.zip
+;
 
 .386
 .model flat,stdcall
@@ -47,10 +49,24 @@ start:
 
 	invoke GetModuleHandle,NULL
 	mov    hInstance,eax
+	
+	invoke InitHyperLinkClass
+	
 	invoke GetCommandLine
 	invoke InitCommonControls
+
+	invoke CreateFontIndirect,offset Tahoma10
+	mov hTahoma,eax
+	
+	invoke CreateSolidBrush,008080FFh
+	mov hBrush,eax
+	
 	mov		CommandLine,eax
 	invoke WinMain,hInstance,NULL,CommandLine,SW_SHOWDEFAULT
+	
+	invoke DeleteObject,hTahoma
+	invoke DeleteObject,hBrush
+	
 	invoke ExitProcess,eax
 
 WinMain proc hInst:HINSTANCE,hPrevInst:HINSTANCE,CmdLine:LPSTR,CmdShow:DWORD
@@ -68,7 +84,6 @@ WinMain proc hInst:HINSTANCE,hPrevInst:HINSTANCE,CmdLine:LPSTR,CmdShow:DWORD
 	mov		wc.lpszMenuName,IDM_MENU
 	mov		wc.lpszClassName,offset ClassName
 	
-	;invoke LoadIcon,NULL,IDI_APPLICATION
 	invoke LoadIcon, hInstance, 500
 	mov		wc.hIcon,eax
 	mov		wc.hIconSm,eax
@@ -78,6 +93,9 @@ WinMain proc hInst:HINSTANCE,hPrevInst:HINSTANCE,CmdLine:LPSTR,CmdShow:DWORD
 	
 	invoke RegisterClassEx,addr wc
 	invoke CreateDialogParam,hInstance,IDD_DIALOG,NULL,addr WndProc,NULL
+	
+	invoke DragAcceptFiles, hWnd, TRUE
+	
 	invoke ShowWindow,hWnd,SW_SHOWNORMAL
 	invoke UpdateWindow,hWnd
 	.while TRUE
@@ -92,26 +110,20 @@ WinMain proc hInst:HINSTANCE,hPrevInst:HINSTANCE,CmdLine:LPSTR,CmdShow:DWORD
 WinMain endp
 
 WndProc proc hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
-LOCAL 	buffer[256]:BYTE
-
+	
 	mov		eax,uMsg
 	.if eax==WM_INITDIALOG
 		push	hWin
 		pop		hWnd
 		
-		invoke GetDlgItem, hWin, PluginComboBox
-		mov hCombo,eax
+		invoke Init, hWin, uMsg, wParam, lParam
 		
-		invoke GetDlgItem, hWin, OutputListBox
-		mov hListBox, eax
+	.elseif eax == WM_DROPFILES
+		invoke DragQueryFile, wParam, NULL, addr GlobalBuffer, 1024
+		mov IsFileSelected, 1
+		invoke SetDlgItemText, hWin, FileNameEdit, addr GlobalBuffer
 		
-		invoke CheckDlgButton, hWin, RealignPECheckBox, BST_CHECKED
-		
-		;invoke LoadLibrary, chr$("C:\Program Files\RadASM\Masm\Projects\fuu\TitanEngine.dll")
-		
-		invoke LoadPlugins, hWin, uMsg, wParam, lParam
-		
-	.elseif eax==WM_COMMAND
+	.elseif eax == WM_COMMAND
 		mov		eax,wParam
 		mov		edx,eax
 		shr		edx,16
@@ -120,21 +132,24 @@ LOCAL 	buffer[256]:BYTE
 		.if edx == BN_CLICKED
 			.if eax==IDM_FILE_EXIT
 				invoke SendMessage,hWin,WM_CLOSE,0,0
-			.elseif eax==IDM_HELP_ABOUT
-				invoke ShellAbout,hWin,addr AppName,addr AboutMsg,NULL
-			.elseif eax == IDM_TOOLS_CRYPTSIGN
-				invoke DetectCryptoSignatures, hWin, addr GlobalBuffer, addr CryptoSignDllName
-			.elseif eax == IDM_TOOLS_DETECTOEP
-				invoke DetectOEP, hWin, addr GlobalBuffer, addr GenOEPDllName
-			.elseif eax == IDM_GENUNPACK
-				invoke GenericUnpacker, hWin, addr GlobalBuffer, addr GenUnpackerDllName
-			.elseif eax == ExitBtn
-				invoke SendMessage,hWin,WM_CLOSE,0,0
-			.elseif eax == AboutBtn
+			.elseif ax == IDM_HELP_ABOUT
+				;invoke ShellAbout,hWin,addr AppName,addr AboutMsg,NULL
 				invoke MessageBox,hWin,offset msgText, offset msgTitle, MB_OK
-			.elseif eax == RefreshBtn
+			.elseif ax == IDM_TOOLS_CRYPTSIGN
+				invoke DetectCryptoSignatures, hWin, addr GlobalBuffer, addr CryptoSignDllName
+			.elseif ax == IDM_TOOLS_DETECTOEP
+				invoke DetectOEP, hWin, addr GlobalBuffer, addr GenOEPDllName
+			.elseif ax == IDM_GENUNPACK
+				invoke GenericUnpacker, hWin, addr GlobalBuffer, addr GenUnpackerDllName
+			.elseif ax == IDM_IDENTIFY_SIGNATURE
+				invoke IdentifyPackerOrCompiler, hWin, addr GlobalBuffer, addr IdentifyPESignatureDllName
+			.elseif ax == ExitBtn
+				invoke SendMessage,hWin,WM_CLOSE,0,0
+			.elseif ax == AboutBtn
+				invoke MessageBox,hWin,offset msgText, offset msgTitle, MB_OK
+			.elseif ax == RefreshBtn
 				invoke RefreshComboBox
-			.elseif eax == UnpackBtn
+			.elseif ax == UnpackBtn
 				invoke SendMessage, hListBox, LB_RESETCONTENT, NULL, NULL
 				
 				invoke IsDlgButtonChecked, hWin, RealignPECheckBox
@@ -149,36 +164,31 @@ LOCAL 	buffer[256]:BYTE
 				.else
 					invoke MessageBox, hWin, offset SelectPluginError, offset ErrorMsgTitle, MB_ICONERROR
 				.endif
-				;invoke MessageBox, hWin, addr [esi].DllName, addr [esi].PluginName, MB_OK
-			.elseif eax == BrowseFileBtn
+				
+			.elseif ax == BrowseFileBtn
 				invoke GetFileDialog
 				invoke SetDlgItemText, hWin, FileNameEdit, addr GlobalBuffer
 			.endif
+		
 		.elseif edx == CBN_SELCHANGE
-			.if eax == PluginComboBox
+			.if ax == PluginComboBox
 				invoke SendMessage, hCombo, CB_GETCURSEL, 0, 0
 				.if eax == CB_ERR 
 					jmp NoSelection
 				.endif
 				mov current_selection, eax
-				;mov ebx, eax
-				;lea esi, pInfo
-				;xor edx, edx
-				;mov eax, sizeof PluginInfo
-				;imul ebx
-				;add esi, eax
-				;invoke GetStructPtr, eax
-				;assume esi: ptr PluginInfo
-				;	invoke MessageBox, hWin, addr [esi].DllName, addr [esi].PluginName, MB_OK
-				;assume esi:nothing
-				;invoke  SendMessage, hCombo, CB_GETLBTEXT, eax, addr buffer 
 			.endif
 		NoSelection:
 			; no item selected
 		.endif
-;	.elseif eax==WM_SIZE
+		
+	.elseif eax == WM_CTLCOLORDLG
+		mov eax, hBrush
+		ret
+		
 	.elseif eax==WM_CLOSE
 		invoke DestroyWindow,hWin
+		
 	.elseif uMsg==WM_DESTROY
 		invoke PostQuitMessage,NULL
 	.else
@@ -189,6 +199,50 @@ LOCAL 	buffer[256]:BYTE
 	ret
 
 WndProc endp
+
+Init proc hWin:HWND, uMsg:UINT, wParam:LPARAM, lParam:LPARAM
+	
+	invoke GetHandlesOfControls, hWin
+	
+	invoke CheckDlgButton, hWin, RealignPECheckBox, BST_CHECKED
+	
+	invoke LoadPlugins, hWin, uMsg, wParam, lParam
+
+	ret
+Init endp 
+
+GetHandlesOfControls proc hWin:HWND
+
+	invoke GetDlgItem, hWin, PluginComboBox
+	mov hCombo,eax
+	
+	invoke GetDlgItem, hWin, OutputListBox
+	mov hListBox, eax
+
+	invoke GetDlgItem, hWin, EmailLink
+	mov hEmailLink, eax
+	
+	invoke SetWindowText,hEmailLink,offset EmailAddress
+	
+	invoke SendMessage,hEmailLink,HLM_SETHOTCOLOR,0,0FF0000h
+	invoke SendMessage,hEmailLink,HLM_SETTEXTCOLOR,0,0
+	invoke SendMessage,hEmailLink,HLM_SETUNDERLINE,0,TRUE
+	
+	invoke SendMessage,hEmailLink,HLM_SETSUBJECT,0,offset Subject
+	invoke SendMessage,hEmailLink,HLM_SETBODY,0,offset Body
+
+	invoke SendMessage,hEmailLink,HLM_SETTYPE,0,HLINK_EMAIL
+	
+	invoke GetDlgItem, hWin, BlogLinkClickable
+	mov hBlogLink, eax
+	
+	invoke SetWindowText, hBlogLink, offset CrackinglandiaLink
+	invoke SendMessage, hBlogLink,HLM_SETHOTCOLOR,0,0FF0000h
+	invoke SendMessage, hBlogLink,HLM_SETTEXTCOLOR,0,0
+	invoke SendMessage, hBlogLink,HLM_SETTYPE,0,HLINK_URL 
+	ret
+
+GetHandlesOfControls endp
 
 GetFileDialog proc
 
@@ -207,18 +261,6 @@ GetFileDialog proc
 	ret
 
 GetFileDialog endp
-
-;GetStructPtr proc Index:DWORD
-;	
-;	mov ebx, Index
-;	lea esi, pInfo
-;	xor edx, edx
-;	mov eax, sizeof PluginInfo
-;	imul ebx
-;	add esi, eax
-;	ret
-;	
-;GetStructPtr endp
 
 GetStructPtr proc lpStruct:DWORD, Index:DWORD
 
@@ -370,7 +412,6 @@ IsElementInList proc lpList:DWORD, lpItem:DWORD
 	
 	.while Counter < ecx
 		mov AuxCounter, ecx
-		;mov esi, dword ptr[esi]
 		invoke GetStructPtr, lpList, Counter
 		
 		assume esi: ptr PluginInfo
@@ -512,6 +553,13 @@ GenericUnpacker proc hWin:HWND, szFileName:DWORD, szDllName:DWORD
 
 GenericUnpacker endp
 
+IdentifyPackerOrCompiler proc hWin:HWND, szFileName:DWORD, szDllName:DWORD
+	
+	invoke DoJob, hWin, szFileName, szDllName
+	ret
+
+IdentifyPackerOrCompiler endp
+
 DoJob proc hWin:HWND, szFileName:DWORD, szDllName:DWORD
 
 	.if IsFileSelected == 1
@@ -637,12 +685,6 @@ LoadPlugins proc hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
 						.if eax != NULL
 							mov GetPluginNameAddrs, eax
 							
-							;lea esi, pInfo
-							;xor edx, edx
-							;mov eax, sizeof PluginInfo
-							;imul counter
-							;add esi, eax
-							;invoke GetStructPtr, counter
 							invoke GetStructPtr, addr pInfo, counter
 							assume esi: ptr PluginInfo
 								mov ebx, counter
@@ -680,42 +722,309 @@ LoadPlugins proc hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
 	.endif
 	
 	invoke FreeString, addr CurrentDir
-	;push hWin
-	;call eax 
-	 
-	;invoke FreeLibrary,addr hModule
 	
-	;lea esi, pInfo
-	;add esi, sizeof PluginInfo
-	
-	;assume esi:ptr PluginInfo
-	;	mov [esi].Index, 45
-	;	mov [esi].DoUnpackAddr, 12345678
-	;assume esi:NOTHING
 	ret
 
-;   xor ecx,ecx ; inicializacion
-  
-;loop_otro:
-;   cmp ecx, NUMERO DE ITEMS
-;    je loop_fin
-;          lea esi, Array
-;          xor edx,edx 
-;          mov eax, sizeof TIPO DE ESTRUCTURA
-;          imul ecx 
-;         add esi,eax ; con esto esi apunta ya al Item
-; 
-;         ; Manipulando la estructura
-;        assume esi: ptr TIPO DE ESTRUCTURA
-;              ; Tocas los item
-;
-;        assume esi:NOTHING
-;       ; Actualizacón par el siguiente item
-;        inc ecx
-;       jmp loop_otro
-;
-;loop_fin:
-
 LoadPlugins endp
+
+_Hyperlink proc hlc_hWin:DWORD,hlc_uMsg:DWORD,hlc_wParam:DWORD,hlc_lParam:DWORD
+	LOCAL hlc_tme				:TRACKMOUSEEVENT
+	LOCAL hlc_ps				:PAINTSTRUCT
+	LOCAL hlc_hdc				:DWORD
+	LOCAL hlc_strlen			:DWORD
+	LOCAL hlc_prc				:RECT
+	LOCAL hlc_color				:DWORD
+	LOCAL hlc_pt				:POINT
+	LOCAL hlc_text[2048]		:BYTE
+	LOCAL hlc_pSubject			:DWORD
+
+	.if hlc_uMsg == WM_SETTEXT
+		; Get the border size
+		invoke GetWindowRect,hlc_hWin,ADDR hlc_prc
+		mov eax,hlc_prc.right
+		sub eax,hlc_prc.left
+		push eax
+		mov eax,hlc_prc.bottom
+		sub eax,hlc_prc.top
+		push eax
+		invoke GetClientRect,hlc_hWin,ADDR hlc_prc
+		pop eax
+		sub eax,hlc_prc.bottom
+		pop ecx
+		push eax
+		sub ecx,hlc_prc.right
+		push ecx
+
+		invoke GetDC,hlc_hWin
+		mov hlc_hdc,eax
+
+		invoke GetWindowLong,hlc_hWin,20
+		.if !eax
+			invoke GetStockObject,SYSTEM_FONT
+		.endif
+		invoke SelectObject,hlc_hdc,eax
+		invoke lstrlen,hlc_lParam
+		mov hlc_strlen,eax
+		invoke DrawText,hlc_hdc,hlc_lParam,hlc_strlen,ADDR hlc_prc,DT_CALCRECT
+		pop ecx
+		add ecx,hlc_prc.right
+		sub ecx,hlc_prc.left
+
+		pop eax
+		add eax,hlc_prc.bottom
+		sub eax,hlc_prc.top
+		invoke SetWindowPos,hlc_hWin,HWND_TOP,0,0,ecx,eax,SWP_NOMOVE or SWP_NOZORDER
+		invoke ReleaseDC,hlc_hWin,hlc_hdc
+
+	.elseif hlc_uMsg == WM_CREATE
+		invoke GlobalAlloc,GMEM_FIXED,4192
+		invoke SetWindowLong,hlc_hWin,12,eax
+
+	.elseif hlc_uMsg == HLM_SETTYPE
+		invoke SetWindowLong,hlc_hWin,0,hlc_lParam
+		ret
+
+	.elseif hlc_uMsg == HLM_SETUNDERLINE
+		invoke SetWindowLong,hlc_hWin,32,hlc_lParam
+		ret
+
+	.elseif hlc_uMsg == HLM_SETHOTCOLOR
+		invoke SetWindowLong,hlc_hWin,4,hlc_lParam
+
+		; set the current color if necessary
+		invoke GetCursorPos,ADDR hlc_pt
+		invoke GetParent,hlc_hWin
+		push eax
+		mov ecx,eax
+		invoke ScreenToClient,ecx,ADDR hlc_pt
+		pop ecx
+		invoke ChildWindowFromPoint,ecx,hlc_pt.x,hlc_pt.y
+		.if eax == hlc_hWin
+			invoke SetWindowLong,hlc_hWin,16,hlc_lParam
+			mov hlc_tme.cbSize,SIZEOF TRACKMOUSEEVENT
+			mov hlc_tme.dwFlags,TME_LEAVE
+			mov eax,hlc_hWin
+			mov hlc_tme.hwndTrack,eax
+			mov hlc_tme.dwHoverTime,HOVER_DEFAULT
+			invoke _TrackMouseEvent,ADDR hlc_tme
+		.endif
+		invoke InvalidateRect,hlc_hWin,NULL,TRUE
+		invoke UpdateWindow,hlc_hWin
+		ret
+
+	.elseif hlc_uMsg == HLM_SETTEXTCOLOR
+		invoke SetWindowLong,hlc_hWin,8,hlc_lParam
+
+		; set the current color if necessary
+		invoke GetCursorPos,ADDR hlc_pt
+		invoke GetParent,hlc_hWin
+		push eax
+		mov ecx,eax
+		invoke ScreenToClient,ecx,ADDR hlc_pt
+		pop ecx
+		invoke ChildWindowFromPoint,ecx,hlc_pt.x,hlc_pt.y
+		.if eax != hlc_hWin
+			invoke SetWindowLong,hlc_hWin,16,hlc_lParam
+		.endif
+		invoke InvalidateRect,hlc_hWin,NULL,TRUE
+		invoke UpdateWindow,hlc_hWin
+		ret
+
+	.elseif hlc_uMsg == HLM_SETSUBJECT
+		invoke lstrlen,hlc_lParam
+		inc eax
+		mov hlc_strlen,eax
+		invoke GetWindowLong,hlc_hWin,24
+		mov hlc_pSubject,eax
+		.if eax
+			invoke GlobalFree,eax
+		.endif
+		invoke GlobalAlloc,GMEM_FIXED,hlc_strlen
+		mov hlc_pSubject,eax
+		.if hlc_strlen >= 1024
+			mov eax,hlc_lParam
+			add eax,1023
+			mov BYTE PTR [eax],0
+		.endif
+		invoke lstrcpy,hlc_pSubject,hlc_lParam
+		invoke SetWindowLong,hlc_hWin,24,hlc_pSubject
+		ret
+
+	.elseif hlc_uMsg == HLM_SETBODY
+		invoke lstrlen,hlc_lParam
+		inc eax
+		mov hlc_strlen,eax
+		invoke GetWindowLong,hlc_hWin,28
+		mov hlc_pSubject,eax
+		.if eax
+			invoke GlobalFree,eax
+		.endif
+		invoke GlobalAlloc,GMEM_FIXED,hlc_strlen
+		mov hlc_pSubject,eax
+		.if hlc_strlen >= 1024
+			mov eax,hlc_lParam
+			add eax,1023
+			mov BYTE PTR [eax],0
+		.endif
+		invoke lstrcpy,hlc_pSubject,hlc_lParam
+		invoke SetWindowLong,hlc_hWin,28,hlc_pSubject
+		ret
+
+	.elseif hlc_uMsg == WM_SETFONT
+		; The def window proc does not do fonts so it has to be done manually
+		invoke SetWindowLong,hlc_hWin,20,hlc_wParam
+		invoke GetWindowText,hlc_hWin,ADDR hlc_text,256
+		invoke SetWindowText,hlc_hWin,ADDR hlc_text
+		.if hlc_lParam
+			invoke InvalidateRect,hlc_hWin,NULL,TRUE
+			invoke UpdateWindow,hlc_hWin
+		.endif
+		ret
+
+	.elseif hlc_uMsg == WM_LBUTTONDOWN
+		invoke GetWindowLong,hlc_hWin,12
+		mov hlc_pSubject,eax
+
+		invoke GetWindowLong,hlc_hWin,0
+		.if eax == HLINK_URL
+			lea eax,hlc_text
+			invoke GetWindowText,hlc_hWin,hlc_pSubject,256
+
+
+		.ELSEIF eax == HLINK_EMAIL
+			jmp @F
+				hlc_szMailTo 	db		"mailto:",0
+				hlc_szSubject	db		"?subject=",0
+				hlc_szBody		db		"&body=",0
+				hlc_szOpen		db		"open",0
+			@@:
+			invoke lstrcpy,hlc_pSubject,OFFSET hlc_szMailTo
+			mov eax,hlc_pSubject
+			add eax,7
+			invoke GetWindowText,hlc_hWin,eax,240
+			invoke GetWindowLong,hlc_hWin,24
+			.IF eax
+				push eax
+				invoke lstrcat,hlc_pSubject,OFFSET hlc_szSubject
+				pop eax
+				invoke lstrcat,hlc_pSubject,eax
+				invoke GetWindowLong,hlc_hWin,28
+				.IF eax
+					push eax
+					invoke lstrcat,hlc_pSubject,OFFSET hlc_szBody
+					pop eax
+					invoke lstrcat,hlc_pSubject,eax
+				.ENDIF
+			.endif
+	
+		.endif
+		invoke ShellExecute, hlc_hWin, OFFSET hlc_szOpen,hlc_pSubject, 0, 0, SW_SHOWNORMAL
+
+	.elseif hlc_uMsg == WM_MOUSEMOVE
+		; The first mouse move message changes the color
+		invoke GetWindowLong,hlc_hWin,4
+		push eax
+		invoke SetWindowLong,hlc_hWin,16,eax
+		pop ecx
+		.IF eax!=ecx
+			invoke GetDlgCtrlID,hlc_hWin
+			push eax
+			invoke GetParent,hlc_hWin
+			pop ecx
+			invoke SendMessage,eax,HLM_ISHOT,ecx,hlc_hWin
+			mov hlc_tme.cbSize,SIZEOF TRACKMOUSEEVENT
+			mov hlc_tme.dwFlags,TME_LEAVE
+			mov eax,hlc_hWin
+			mov hlc_tme.hwndTrack,eax
+			mov hlc_tme.dwHoverTime,HOVER_DEFAULT
+			invoke _TrackMouseEvent,ADDR hlc_tme
+			invoke InvalidateRect,hlc_hWin,NULL,TRUE
+		.ENDIF
+
+	.elseif hlc_uMsg == WM_MOUSELEAVE
+		invoke GetWindowLong,hlc_hWin,8
+		invoke SetWindowLong,hlc_hWin,16,eax
+		invoke InvalidateRect,hlc_hWin,NULL,TRUE
+		ret
+
+	.elseif hlc_uMsg == WM_PAINT
+		invoke GetWindowText,hlc_hWin,ADDR hlc_text,256
+		mov hlc_strlen,eax
+		invoke GetWindowLong,hlc_hWin,16
+		mov hlc_color,eax
+		invoke BeginPaint,hlc_hWin,ADDR hlc_ps
+			mov hlc_hdc,eax
+			invoke GetWindowLong,hlc_hWin,20
+			invoke SelectObject,hlc_hdc,eax
+			invoke SetTextColor,hlc_hdc,hlc_color
+			invoke SetBkMode,hlc_hdc,TRANSPARENT
+			invoke TextOut,hlc_hdc,0,0,ADDR hlc_text,hlc_strlen
+			invoke GetWindowLong,hlc_hWin,32 ; Underline
+			.IF eax
+				; a line is drawn
+				invoke CreatePen,PS_SOLID,1,hlc_color
+				invoke SelectObject,hlc_hdc,eax
+				push eax
+				invoke GetClientRect,hlc_hWin,ADDR hlc_prc
+				dec hlc_prc.bottom
+				invoke MoveToEx,hlc_hdc,0,hlc_prc.bottom,NULL
+				invoke LineTo,hlc_hdc,hlc_prc.right,hlc_prc.bottom
+				pop eax
+				invoke SelectObject,hlc_hdc,eax
+				invoke DeleteObject,eax
+			.endif
+		invoke EndPaint,hlc_hWin,ADDR hlc_ps
+		ret
+
+	.elseif hlc_uMsg == WM_DESTROY
+		invoke GetWindowLong,hlc_hWin,12
+		.IF eax
+			invoke GlobalFree,eax
+		.endif
+		invoke GetWindowLong,hlc_hWin,24
+		.IF eax
+			invoke GlobalFree,eax
+		.endif
+		invoke GetWindowLong,hlc_hWin,28
+		.IF eax
+			invoke GlobalFree,eax
+		.endif
+
+	.endif
+
+	invoke DefWindowProc,hlc_hWin,hlc_uMsg,hlc_wParam,hlc_lParam
+	ret
+	
+_Hyperlink endp
+
+InitHyperLinkClass proc
+	LOCAL hlc_wcx			:WNDCLASSEX
+
+	jmp @F
+		UDC_HyperClass	db		"UDC_HyperLink",0
+	@@:
+
+	mov hlc_wcx.cbSize,SIZEOF WNDCLASSEX
+	mov hlc_wcx.style, CS_HREDRAW or CS_VREDRAW
+	mov eax,hInstance
+	mov hlc_wcx.hInstance,eax
+	mov hlc_wcx.lpszClassName,OFFSET UDC_HyperClass
+	mov hlc_wcx.cbClsExtra,0
+	mov hlc_wcx.cbWndExtra,36
+	mov hlc_wcx.lpfnWndProc,OFFSET _Hyperlink
+	mov hlc_wcx.hIcon,NULL
+	mov hlc_wcx.hIconSm,NULL
+	invoke GetStockObject,NULL_BRUSH
+	mov hlc_wcx.hbrBackground,eax
+	mov hlc_wcx.lpszMenuName,NULL
+
+	invoke LoadCursor,NULL,IDC_HAND
+	mov hlc_wcx.hCursor,eax
+
+	invoke RegisterClassEx,ADDR hlc_wcx
+
+	ret
+
+InitHyperLinkClass endp
 
 end start
