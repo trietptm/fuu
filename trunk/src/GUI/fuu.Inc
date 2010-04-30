@@ -4,31 +4,37 @@ include kernel32.inc
 include shell32.inc
 include comctl32.inc
 include comdlg32.inc
+include gdi32.inc
 
 includelib user32.lib
 includelib kernel32.lib
 includelib shell32.lib
 includelib comctl32.lib
 includelib comdlg32.lib
+includelib gdi32.lib
 
 WinMain						PROTO :DWORD,:DWORD,:DWORD,:DWORD
 WndProc						PROTO :DWORD,:DWORD,:DWORD,:DWORD
 LoadPlugins					PROTO :DWORD,:DWORD,:DWORD,:DWORD
+Init						PROTO :DWORD,:DWORD,:DWORD,:DWORD
+_Hyperlink					PROTO :DWORD,:DWORD,:DWORD,:DWORD
 InitializeUnpacker			PROTO :DWORD,:DWORD,:DWORD
 DoJob						PROTO :DWORD,:DWORD,:DWORD
 DetectCryptoSignatures 		PROTO :DWORD,:DWORD,:DWORD
 DetectOEP					PROTO :DWORD,:DWORD,:DWORD
 GenericUnpacker				PROTO :DWORD,:DWORD,:DWORD
+IdentifyPackerOrCompiler	PROTO :DWORD,:DWORD,:DWORD
 GetStructPtr				PROTO :DWORD,:DWORD
 GetElementFromList			PROTO :DWORD,:DWORD
 IsElementInList				PROTO :DWORD,:DWORD
 AddElementToList			PROTO :DWORD,:DWORD
-;GetStructPtr				PROTO :DWORD
+GetHandlesOfControls		PROTO :DWORD
 FreeString 					PROTO :DWORD
 PopulateList				PROTO :DWORD
 GetNumberOfItems			PROTO :DWORD
 GetFileDialog				PROTO
 RefreshComboBox				PROTO
+InitHyperLinkClass			PROTO
 
 IDD_DIALOG			equ 1000
 IDM_MENU			equ 10000
@@ -37,6 +43,7 @@ IDM_HELP_ABOUT		equ 10101
 IDM_TOOLS_CRYPTSIGN equ 10003
 IDM_TOOLS_DETECTOEP equ 10002
 IDM_GENUNPACK		equ 10004
+IDM_IDENTIFY_SIGNATURE equ 10005
 FileNameEdit		equ 1001
 ExitBtn				equ 1007
 AboutBtn			equ 1006
@@ -46,6 +53,20 @@ BrowseFileBtn		equ 1005
 OutputListBox		equ 1004
 RealignPECheckBox	equ 1012
 RefreshBtn			equ 1010
+BlogLinkEdit		equ 1011
+BlogLinkClickable	equ 1013
+EmailLink			equ 1011
+
+HLM_SETTYPE			equ		WM_USER+200 ; lParam = HLINK_URL/HLINK_EMAIL wndxtra 0
+HLM_SETHOTCOLOR		equ		WM_USER+201 ; lParam = Hot color wndxtra 4
+HLM_SETTEXTCOLOR	equ		WM_USER+202 ; lParam = Normal text color wndxtra 8
+HLM_ISHOT			equ		WM_USER+206 ; Sent to parent wParam = ID, lParam = hControl
+HLM_SETSUBJECT		equ		WM_USER+203 ; lParam = Email subject line wndxtra 24
+HLM_SETBODY			equ		WM_USER+204 ; lParam = Email body wndxtra 28
+HLM_SETUNDERLINE	equ		WM_USER+205 ; lParam = Underline link TRUE/FALSE wndxtra 32
+
+HLINK_URL			equ		0
+HLINK_EMAIL			equ		1
 
 chr$ MACRO any_text:VARARG
 LOCAL txtname
@@ -87,10 +108,16 @@ PluginsIA64DirName	db "Plugins\x64",0
 CryptoSignDllName	db "kanal.dll",0
 GenOEPDllName		db "GenOEP.dll",0
 GenUnpackerDllName	db "ZDRx.dll",0
+IdentifyPESignatureDllName db "Detect_Signatures.dll",0
 DoMyJobProcName		db "DoMyJob",0
 SelectionFileErrorMsg db 'You must select a file first',0
+CrackinglandiaLink	db "http://crackinglandia.blogspot.com",0
+EmailAddress		db "nahuelriva@gmail.com",0
+Subject				db "FUU",0
+Body				db "A message about FUU",0
 
 .data
+Tahoma10			LOGFONT <-13,0,0,0,900,FALSE,FALSE,0,0,0,0,0,0,"Tahoma">
 DoUnpackAddrs		dd 0
 GetPluginNameAddrs	dd 0
 counter				dd 0
@@ -108,9 +135,13 @@ hListBox			dd ?
 hCombo				dd ?
 fHandle				dd ?
 hModule				dd ?
+hBlogLink			dd ?
 hInstance			dd ?
+hEmailLink			dd ?
 CommandLine			dd ?
 hWnd				dd ?
 _lpItem				dd ?
+hBrush				dd ?
+hTahoma				dd ?
 GlobalBuffer 		db 1024 dup(?)
 ofn 				OPENFILENAME <?>
