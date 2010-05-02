@@ -97,7 +97,7 @@ fPattern			db '*.dll',0
 DoUnpackName		db 'DoUnpack',0
 GetPluginName		db 'GetPluginName',0
 SelectPluginError	db 'You must select a plugin first',0
-ErrorMsgText		db 'An error has ocurred while laoding plugins',0
+ErrorMsgText		db 'An error has ocurred while loading plugins',0
 ErrorMsgTitle		db 'Fatal Error',0
 FilterString 		db "All Files",0,"*.*",0h,0h
 ErrorMsg			db 'Error',0
