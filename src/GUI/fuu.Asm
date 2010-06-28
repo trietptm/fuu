@@ -1,47 +1,52 @@
-; Faster Universal Unpacker v1.0
-;
-; Copyright (C) 2010 +NCR/CRC! [ReVeRsEr] http://crackinglandia.blogspot.com
-;
-; This program is free software: you can redistribute it and/or modify
-; it under the terms of the GNU General Public License as published by
-; the Free Software Foundation, either version 3 of the License, or
-; any later version.
-;
-; This program is distributed in the hope that it will be useful,
-; but WITHOUT ANY WARRANTY; without even the implied warranty of
-; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-; GNU General Public License for more details.
-;
-; You should have received a copy of the GNU General Public License
-; along with this program.  If not, see <http://www.gnu.org/licenses/>.
-;
-; FUU - Faster Universal Unpacker
-; 
-; Author: +NCR/CRC! [ReVeRsEr]
-; Date: Wednesday, March 24 th 2010
-;
-; Every plugin will export these functions:
-;
-; GetPluginName - returns the plugin's name
-; DoUnpack - this routine does the magic to unpack :P
-;
-; DoUnpack will receive the path and filename, the
-; main dlg handle, an ID (FUU1) and lParam.
-;
-;
-; Thanks to all the people in CracksLatinoS!
-; for helping me answering my questions!
-; 
-; Special thanks to GUAN DE DIO and marciano
-;
-; Hyperlink stuffs from: http://members.a1.net/ranmasaotome/masm32/Hyperlink.zip
-;
+comment ~
+Faster Universal Unpacker v0.1.1
+
+Copyright (C) 2010 +NCR/CRC! [ReVeRsEr] http://crackinglandia.blogspot.com
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+FUU - Faster Universal Unpacker
+
+Author: +NCR/CRC! [ReVeRsEr]
+Date: Wednesday, March 24 th 2010
+
+Every plugin will export these functions:
+
+* GetPluginName - returns the plugin's name
+DoUnpack - this routine does the magic to unpack :P
+
+* DoUnpack will receive the path and filename, the
+main dlg handle, an ID (FUU1) and lParam.
+
+
+Thanks to all the people in CracksLatinoS!
+for helping me answering my questions!
+
+Special thanks to GUAN DE DIO and marciano
+
+Hyperlink stuffs from: http://members.a1.net/ranmasaotome/masm32/Hyperlink.zip
+~
 
 .386
 .model flat,stdcall
 option casemap:none
 
 include fuu.inc
+
+; Externals
+include .\External\Funciones.inc
+include .\External\ListaDoble.inc
 
 .code
 
@@ -58,14 +63,14 @@ start:
 	invoke CreateFontIndirect,offset Tahoma10
 	mov hTahoma,eax
 	
-	invoke CreateSolidBrush,008080FFh
-	mov hBrush,eax
+	;invoke CreateSolidBrush,008080FFh
+	;mov hBrush,eax
 	
 	mov		CommandLine,eax
 	invoke WinMain,hInstance,NULL,CommandLine,SW_SHOWDEFAULT
 	
 	invoke DeleteObject,hTahoma
-	invoke DeleteObject,hBrush
+	;invoke DeleteObject,hBrush
 	
 	invoke ExitProcess,eax
 
@@ -117,11 +122,12 @@ WndProc proc hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
 		pop		hWnd
 		
 		invoke Init, hWin, uMsg, wParam, lParam
-		
+			
 	.elseif eax == WM_DROPFILES
 		invoke DragQueryFile, wParam, NULL, addr GlobalBuffer, 1024
 		mov IsFileSelected, 1
 		invoke SetDlgItemText, hWin, FileNameEdit, addr GlobalBuffer
+		invoke EnableWindow, hUnpackButton, TRUE
 		
 	.elseif eax == WM_COMMAND
 		mov		eax,wParam
@@ -130,11 +136,14 @@ WndProc proc hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
 		and		eax,0FFFFh
 		
 		.if edx == BN_CLICKED
-			.if eax==IDM_FILE_EXIT
+			.if ax==IDM_FILE_EXIT
 				invoke SendMessage,hWin,WM_CLOSE,0,0
 			.elseif ax == IDM_HELP_ABOUT
-				;invoke ShellAbout,hWin,addr AppName,addr AboutMsg,NULL
 				invoke MessageBox,hWin,offset msgText, offset msgTitle, MB_OK
+			.elseif ax == IDM_HELP_SUPPORT
+				invoke ShellExecute, hWin, chr$("open"), chr$("http://groups.google.com/group/faster-universal-unpacker"), 0, 0, SW_SHOWNORMAL
+			.elseif ax == IDM_HELP_HOME
+				invoke ShellExecute, hWin, chr$("open"), chr$("http://code.google.com/p/fuu/"), 0, 0, SW_SHOWNORMAL 
 			.elseif ax == IDM_TOOLS_CRYPTSIGN
 				invoke DetectCryptoSignatures, hWin, addr GlobalBuffer, addr CryptoSignDllName
 			.elseif ax == IDM_TOOLS_DETECTOEP
@@ -146,9 +155,10 @@ WndProc proc hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
 			.elseif ax == ExitBtn
 				invoke SendMessage,hWin,WM_CLOSE,0,0
 			.elseif ax == AboutBtn
-				invoke MessageBox,hWin,offset msgText, offset msgTitle, MB_OK
+				invoke MessageBox,hWin, offset msgText, offset msgTitle, MB_OK
 			.elseif ax == RefreshBtn
-				invoke RefreshComboBox
+				invoke SendMessage, hCombo, CB_RESETCONTENT, 0, 0
+				invoke RefreshComboBox, hWin, uMsg, wParam, lParam
 			.elseif ax == UnpackBtn
 				invoke SendMessage, hListBox, LB_RESETCONTENT, NULL, NULL
 				
@@ -158,7 +168,7 @@ WndProc proc hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
 				.endif 
 				
 				mov eax, current_selection
-				invoke GetStructPtr,addr pInfo, eax
+				;invoke GetStructPtr,addr pInfo, eax
 				.if current_selection != CB_ERR
 					invoke InitializeUnpacker, hWin, addr GlobalBuffer, current_selection
 				.else
@@ -167,29 +177,30 @@ WndProc proc hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
 				
 			.elseif ax == BrowseFileBtn
 				invoke GetFileDialog
-				invoke SetDlgItemText, hWin, FileNameEdit, addr GlobalBuffer
+				.if IsFileSelected == 1
+					invoke SetDlgItemText, hWin, FileNameEdit, addr GlobalBuffer
+					invoke EnableWindow, hUnpackButton, TRUE
+				.endif
 			.endif
 		
 		.elseif edx == CBN_SELCHANGE
 			.if ax == PluginComboBox
 				invoke SendMessage, hCombo, CB_GETCURSEL, 0, 0
-				.if eax == CB_ERR 
-					jmp NoSelection
+				.if eax != CB_ERR
+					mov current_selection, eax
 				.endif
-				mov current_selection, eax
 			.endif
-		NoSelection:
-			; no item selected
 		.endif
 		
-	.elseif eax == WM_CTLCOLORDLG
-		mov eax, hBrush
-		ret
+	;.elseif eax == WM_CTLCOLORDLG
+	;	mov eax, hBrush
+	;	ret
 		
 	.elseif eax==WM_CLOSE
+		invoke DestroyHandles
 		invoke DestroyWindow,hWin
 		
-	.elseif uMsg==WM_DESTROY
+	.elseif eax == WM_DESTROY
 		invoke PostQuitMessage,NULL
 	.else
 		invoke DefWindowProc,hWin,uMsg,wParam,lParam
@@ -202,9 +213,27 @@ WndProc endp
 
 Init proc hWin:HWND, uMsg:UINT, wParam:LPARAM, lParam:LPARAM
 	
+	invoke CrearListaDoble, sizeof PluginInfo
+	.if eax == 0
+		invoke MessageBox, hWin, chr$("INITERROR: Failed to build internal list object"), chr$("Initialize Error"), MB_ICONERROR 
+		invoke ExitProcess, -1
+	.endif
+	
+	mov hList, eax
+	
+
+	invoke CrearListaDoble, sizeof PluginInfo
+	.if eax == 0
+		invoke MessageBox, hWin, chr$("INITERROR: Failed to build internal list object"), chr$("Initialize Error"), MB_ICONERROR 
+		invoke ExitProcess, -1
+	.endif
+	
+	mov hAuxList, eax
+	
 	invoke GetHandlesOfControls, hWin
 	
 	invoke CheckDlgButton, hWin, RealignPECheckBox, BST_CHECKED
+	invoke CheckDlgButton, hWin, CopyOverlayDataBt, BST_CHECKED
 	
 	invoke LoadPlugins, hWin, uMsg, wParam, lParam
 
@@ -221,6 +250,9 @@ GetHandlesOfControls proc hWin:HWND
 
 	invoke GetDlgItem, hWin, EmailLink
 	mov hEmailLink, eax
+	
+	invoke GetDlgItem, hWin, UnpackBtn
+	mov hUnpackButton, eax
 	
 	invoke SetWindowText,hEmailLink,offset EmailAddress
 	
@@ -244,6 +276,23 @@ GetHandlesOfControls proc hWin:HWND
 
 GetHandlesOfControls endp
 
+DestroyHandles proc
+	
+	invoke CloseHandle, hList
+	invoke CloseHandle, hAuxList
+	invoke CloseHandle, hListBox
+	invoke CloseHandle, hCombo
+	invoke CloseHandle, fHandle
+	invoke CloseHandle, hModule
+	invoke CloseHandle, hBlogLink
+	invoke CloseHandle, hInstance
+	invoke CloseHandle, hEmailLink
+	invoke CloseHandle, hWnd
+	invoke CloseHandle, hTahoma
+	ret
+
+DestroyHandles endp
+
 GetFileDialog proc
 
 	pushad
@@ -262,6 +311,7 @@ GetFileDialog proc
 
 GetFileDialog endp
 
+comment ~
 GetStructPtr proc lpStruct:DWORD, Index:DWORD
 
 	mov esi, dword ptr[lpStruct]
@@ -273,11 +323,25 @@ GetStructPtr proc lpStruct:DWORD, Index:DWORD
 	ret
 
 GetStructPtr endp
+~
 
 InitializeUnpacker proc hWin:HWND,FileName:DWORD,CurrentSelection:DWORD
 
 	.if IsFileSelected == 1
 		mov eax, CurrentSelection
+		invoke GetItemByIndex, eax
+		;invoke BuscarItemListaDoble, hList, eax, NULL, offset SearchItemInList
+		.if eax != NULL
+			push offset RealignPEFlag
+			push offset FUUID
+			push FileName
+			push hWin
+			call eax
+		.else
+			invoke MessageBox, hWin, chr$("Error: Selection Error!"), chr$("Error"), MB_ICONERROR
+		.endif
+		
+		comment ~
 		invoke GetStructPtr, addr pInfo, eax
 		assume esi: ptr PluginInfo
 			push offset RealignPEFlag
@@ -286,6 +350,7 @@ InitializeUnpacker proc hWin:HWND,FileName:DWORD,CurrentSelection:DWORD
 			push hWin
 			call [esi].DoUnpackAddr
 		assume esi:nothing
+		~
 	.else
 		invoke MessageBox, hWin, offset SelectionFileErrorMsg, offset ErrorMsg, MB_ICONERROR
 	.endif
@@ -293,30 +358,98 @@ InitializeUnpacker proc hWin:HWND,FileName:DWORD,CurrentSelection:DWORD
 
 InitializeUnpacker endp
 
+GetItemByIndex proc lpIndex:DWORD
+	LOCAL TempBuff:PluginInfo
+	
+	invoke ItemPosByIndexListaDoble, hList, lpIndex
+	mov ebx,eax
+	invoke RecuperarItemListaDoble, hList, ebx , addr TempBuff	
+	
+	mov eax, TempBuff.DoUnpackAddr
+	ret
+
+GetItemByIndex endp
+
+RefreshComboBox proc hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
+	
+	invoke VaciarListaDoble, hList
+	invoke LoadPlugins, hWin, uMsg, wParam, lParam
+	comment ~
+	LOCAL i:BYTE
+	LOCAL TempBuff:PluginInfo
+	
+	invoke PopulateList, hAuxList
+	
+	invoke NumeroItemListaDoble, hAuxList
+ 	mov i, al
+ 	
+ 	; while AuxList has elements ...
+ 	.while i > 0
+		; get an element from AuxList
+		invoke ItemPosByIndexListaDoble, hAuxList, i
+		mov ebx,eax
+		invoke RecuperarItemListaDoble, hAuxList, ebx ,addr TempBuff
+		
+		; if element is not in the first list ...
+		lea esi, TempBuff
+		assume esi: ptr PluginInfo
+			invoke BuscarItemListaDoble, hList, addr [esi].DllName, NULL, offset SearchItemInList
+		assume esi: nothing
+		
+		; if element is not in the first list ...
+		.if eax == NULL
+			; add it ...
+			invoke InsertItemInList, hList, addr TempBuff
+		.endif
+		
+		; if element is not in list ...
+		; we must keep searching ...
+		dec i
+ 	.endw
+ 	~
+	ret
+
+RefreshComboBox endp
+
+SearchItemInList proc lpItem:DWORD, lpItemToCompare:DWORD, ItemSize:DWORD
+	
+	mov esi, lpItemToCompare
+	assume esi: ptr PluginInfo
+		invoke lstrcmp, lpItem, addr [esi].DllName
+	assume esi: nothing
+	
+	.if eax == 0
+		mov eax,1 ; end of search
+	.else
+		xor eax,eax ; keep searching
+	.endif
+
+	ret
+
+SearchItemInList endp
+
+comment ~
 RefreshComboBox proc
 	LOCAL FindData:WIN32_FIND_DATA
 	LOCAL Counter:DWORD
-
-	; 
-	; L1 = List();
-	; L2 = List();
-	; L3 = List()
-	; Top = Int();
-	; Counter = Int()
-	; 
-	; PopulateList(L1);
-	; PopulateList(L2);
-	;
-	; Top = len(L1)
-	; 
-	; item = GetElementFromList(L1);
-	; while Counter < Top 
-	; 	InList = IsElementInList(L2, item);
-	; 	if not InList
-	; 		AddElementToList(L3)
-	; 	GetNextElementInList(L1)
-	; 	inc Counter
-	; 
+	
+	;L1 = List();
+	;L2 = List();
+	;L3 = List()
+	;Top = Int();
+	;Counter = Int()
+	
+	;PopulateList(L1);
+	;PopulateList(L2);
+	;	Top = len(L1)
+	
+	;item = GetElementFromList(L1);
+	;while Counter < Top 
+	;	InList = IsElementInList(L2, item);
+	;	if not InList
+	;		AddElementToList(L3)
+	;	GetNextElementInList(L1)
+	;	inc Counter
 	
 	pushad
 	mov Counter, 0
@@ -469,18 +602,20 @@ GetNumberOfItems proc lpList
 	.endw
 	popad
 	mov eax, Counter
-	; XXX: HACK! don't do this at home!
-	; this is because we have an extra dll (TitanEngine.dll)
-	; and TitanEngine.dll is not loaded as a plugin in the IDE
+
+	;XXX: HACK! don't do this at home!
+	;this is because we have an extra dll (TitanEngine.dll)
+	;and TitanEngine.dll is not loaded as a plugin in the IDE
+
 	sub eax, 1
 	ret
 
 GetNumberOfItems endp
 
-PopulateList proc lpList:DWORD
+PopulateList proc _hList:DWORD
 	LOCAL findData:WIN32_FIND_DATA
-	LOCAL Counter:DWORD
-	LOCAL StructCounter:DWORD
+	;LOCAL Counter:DWORD
+	;LOCAL StructCounter:DWORD
 	
 	pushad
 	invoke GetModuleFileName, hInstance, addr CurrentDir, MAX_PATH
@@ -498,7 +633,7 @@ PopulateList proc lpList:DWORD
 	
 	invoke lstrlen, esi
 	
-	mov Counter, 0
+	;mov Counter, 0
 	
 	.if eax < MAX_PATH
 		invoke lstrcat, esi, addr Pluginsx86DirName
@@ -508,19 +643,20 @@ PopulateList proc lpList:DWORD
 		.if eax != INVALID_HANDLE_VALUE
 			mov fHandle, eax
 			.while eax !=0
-				invoke GetStructPtr, lpList, Counter
+				;invoke GetStructPtr, lpList, Counter
 				
-				assume esi: ptr PluginInfo
-					invoke lstrlen,addr findData.cFileName
-					inc eax
-					.if eax < MAX_PATH
-						invoke lstrcmp, addr findData.cFileName, chr$("TitanEngine.dll")
-						.if eax != 0
-							invoke lstrcpy, addr [esi].DllName, addr findData.cFileName
-							inc Counter
-						.endif								
-					.endif
-				assume esi:nothing
+				;assume esi: ptr PluginInfo
+				invoke lstrlen,addr findData.cFileName
+				inc eax
+				.if eax < MAX_PATH
+					invoke lstrcmp, addr findData.cFileName, chr$("TitanEngine.dll")
+					.if eax != 0
+						invoke lstrcpy, addr PIAuxList.DllName, addr findData.cFileName
+						invoke InsertItemInList, _hList, addr PIAuxList
+						;inc Counter
+					.endif								
+				.endif
+				;assume esi:nothing
 				invoke FindNextFile, fHandle, addr findData
 			.endw
 		.endif
@@ -531,7 +667,7 @@ PopulateList proc lpList:DWORD
 	ret
 
 PopulateList endp
-
+~
 DetectCryptoSignatures proc hWin:HWND, szFileName:DWORD, szDllName:DWORD
 	
 	invoke DoJob, hWin, szFileName, szDllName
@@ -649,6 +785,32 @@ FreeString proc szString:DWORD
 
 FreeString endp
 
+comment ~
+InsertItem proc
+	
+	mov PIList.Index, 1
+	mov PIList.GetPlugNameAddr, 12345678h
+	mov PIList.DoUnpackAddr, 98765431h
+	
+	invoke lstrcpy, addr PIList.DllName, chr$("windows.dll")
+	invoke lstrcpy, addr PIList.PluginName, chr$("HolaManola")
+	
+	invoke UltimoNodoListaDoble, hList
+	invoke AnadirItemListaDoble, hList, addr PIList, eax
+	ret
+
+InsertItem endp
+~
+
+InsertItemInList proc List:DWORD, lpItem:DWORD
+
+	invoke UltimoNodoListaDoble, List
+	invoke AnadirItemListaDoble, List, lpItem, eax
+
+	ret
+
+InsertItemInList endp
+
 LoadPlugins proc hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
 	LOCAL findData:WIN32_FIND_DATA
 	
@@ -680,11 +842,37 @@ LoadPlugins proc hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
 					mov hModule, eax
 					invoke GetProcAddress,eax, offset DoUnpackName
 					.if eax != NULL
-						mov DoUnpackAddrs, eax
+						mov PIList.DoUnpackAddr, eax
+						;mov DoUnpackAddrs, eax
 						invoke GetProcAddress, hModule, offset GetPluginName
 						.if eax != NULL
-							mov GetPluginNameAddrs, eax
+							mov PIList.GetPlugNameAddr, eax
+							;mov GetPluginNameAddrs, eax
 							
+							mov ebx, counter
+							inc ebx
+							mov PIList.Index, ebx
+							
+							invoke lstrlen,addr findData.cFileName
+							inc eax
+							.if eax < MAX_PATH
+								invoke lstrcpyn,addr PIList.DllName, addr findData.cFileName, eax
+								
+								call PIList.GetPlugNameAddr
+								mov ebx, eax
+								invoke lstrlen,eax
+								inc eax
+								.if eax < MAX_PATH
+									invoke lstrcpyn,addr PIList.PluginName, ebx, eax
+									
+									invoke SendMessage, hCombo, CB_ADDSTRING, 0, ebx
+									
+									invoke InsertItemInList, hList, addr PIList
+									
+								.endif
+							.endif
+							
+							comment ~
 							invoke GetStructPtr, addr pInfo, counter
 							assume esi: ptr PluginInfo
 								mov ebx, counter
@@ -711,6 +899,7 @@ LoadPlugins proc hWin:HWND,uMsg:UINT,wParam:WPARAM,lParam:LPARAM
 								.endif
 							assume esi:nothing
 							inc counter
+							~
 						.endif 
 					.endif
 				.endif
@@ -975,6 +1164,7 @@ _Hyperlink proc hlc_hWin:DWORD,hlc_uMsg:DWORD,hlc_wParam:DWORD,hlc_lParam:DWORD
 			.endif
 		invoke EndPaint,hlc_hWin,ADDR hlc_ps
 		ret
+
 
 	.elseif hlc_uMsg == WM_DESTROY
 		invoke GetWindowLong,hlc_hWin,12
