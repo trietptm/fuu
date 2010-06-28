@@ -3,37 +3,41 @@ include user32.inc
 include kernel32.inc
 include shell32.inc
 include comctl32.inc
-include comdlg32.inc
-include gdi32.inc
+;include comdlg32.inc
+;include gdi32.inc
 
 includelib user32.lib
 includelib kernel32.lib
 includelib shell32.lib
 includelib comctl32.lib
-includelib comdlg32.lib
-includelib gdi32.lib
+;includelib comdlg32.lib
+;includelib gdi32.lib
 
 WinMain						PROTO :DWORD,:DWORD,:DWORD,:DWORD
 WndProc						PROTO :DWORD,:DWORD,:DWORD,:DWORD
 LoadPlugins					PROTO :DWORD,:DWORD,:DWORD,:DWORD
 Init						PROTO :DWORD,:DWORD,:DWORD,:DWORD
 _Hyperlink					PROTO :DWORD,:DWORD,:DWORD,:DWORD
+RefreshComboBox				PROTO :DWORD,:DWORD,:DWORD,:DWORD
 InitializeUnpacker			PROTO :DWORD,:DWORD,:DWORD
 DoJob						PROTO :DWORD,:DWORD,:DWORD
 DetectCryptoSignatures 		PROTO :DWORD,:DWORD,:DWORD
 DetectOEP					PROTO :DWORD,:DWORD,:DWORD
 GenericUnpacker				PROTO :DWORD,:DWORD,:DWORD
 IdentifyPackerOrCompiler	PROTO :DWORD,:DWORD,:DWORD
+SearchItemInList			PROTO :DWORD,:DWORD,:DWORD
 GetStructPtr				PROTO :DWORD,:DWORD
 GetElementFromList			PROTO :DWORD,:DWORD
 IsElementInList				PROTO :DWORD,:DWORD
 AddElementToList			PROTO :DWORD,:DWORD
+InsertItemInList			PROTO :DWORD,:DWORD
 GetHandlesOfControls		PROTO :DWORD
 FreeString 					PROTO :DWORD
-PopulateList				PROTO :DWORD
 GetNumberOfItems			PROTO :DWORD
+GetItemByIndex				PROTO :DWORD
+PopulateList				PROTO :DWORD
 GetFileDialog				PROTO
-RefreshComboBox				PROTO
+DestroyHandles				PROTO
 InitHyperLinkClass			PROTO
 
 IDD_DIALOG			equ 1000
@@ -44,6 +48,8 @@ IDM_TOOLS_CRYPTSIGN equ 10003
 IDM_TOOLS_DETECTOEP equ 10002
 IDM_GENUNPACK		equ 10004
 IDM_IDENTIFY_SIGNATURE equ 10005
+IDM_HELP_SUPPORT	equ 10006
+IDM_HELP_HOME		equ 10007
 FileNameEdit		equ 1001
 ExitBtn				equ 1007
 AboutBtn			equ 1006
@@ -52,6 +58,7 @@ PluginComboBox		equ 1008
 BrowseFileBtn		equ 1005
 OutputListBox		equ 1004
 RealignPECheckBox	equ 1012
+CopyOverlayDataBt	equ 1014
 RefreshBtn			equ 1010
 BlogLinkEdit		equ 1011
 BlogLinkClickable	equ 1013
@@ -97,7 +104,7 @@ fPattern			db '*.dll',0
 DoUnpackName		db 'DoUnpack',0
 GetPluginName		db 'GetPluginName',0
 SelectPluginError	db 'You must select a plugin first',0
-ErrorMsgText		db 'An error has ocurred while loading plugins',0
+ErrorMsgText		db 'An error has ocurred while laoding plugins',0
 ErrorMsgTitle		db 'Fatal Error',0
 FilterString 		db "All Files",0,"*.*",0h,0h
 ErrorMsg			db 'Error',0
@@ -125,14 +132,19 @@ current_selection	dd CB_ERR
 CurrentDir			db MAX_PATH dup(0)
 ToolsDir			db MAX_PATH dup(0)
 TempDllName			db MAX_PATH dup(0)
-pInfo				PluginInfo 255 dup(<>)
-AuxList				PluginInfo 255 dup(<>)
+;pInfo				PluginInfo 255 dup(<>)
+;AuxList			PluginInfo 255 dup(<>)
 IsFileSelected		db 0
 RealignPEFlag		dd 0
+PIList				PluginInfo {}
+PIAuxList			PluginInfo {}
 
 .data?
 hListBox			dd ?
 hCombo				dd ?
+hUnpackButton		dd ?
+hList				dd ?
+hAuxList			dd ?
 fHandle				dd ?
 hModule				dd ?
 hBlogLink			dd ?
@@ -140,8 +152,8 @@ hInstance			dd ?
 hEmailLink			dd ?
 CommandLine			dd ?
 hWnd				dd ?
-_lpItem				dd ?
-hBrush				dd ?
+;_lpItem			dd ?
+;hBrush				dd ?
 hTahoma				dd ?
 GlobalBuffer 		db 1024 dup(?)
 ofn 				OPENFILENAME <?>

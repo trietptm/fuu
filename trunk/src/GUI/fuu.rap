@@ -64,7 +64,7 @@ MilestoneOnTime=2
 MilestoneOnDate=0
 MilestoneOnDateWhen=1
 MilestoneOnDateStatus=0
-MilestoneOnDateDate=30
+MilestoneOnDateDate=25
 MilestoneOnDateTimeYear=2010
 MilestoneOnDateTimeMonth=3
 MilestoneOnDateTimeDate=24
@@ -101,9 +101,9 @@ ProductVer4Range=0
 2=
 3=
 [Size]
-1=0,0,0,0,8045
+1=0,0,0,0,10241
 4=0,0,0,0
-2=0,0,0,0,3138
+2=0,0,0,0,1438
 3=0,0,0,0,93
 [BookMark]
 0=
@@ -119,13 +119,13 @@ ProductVer4Range=0
 [BreakPoint]
 0=
 [Find]
-1="HLM_SETSUBJECT"
-2="bloglink"
-3="InitHyperLinkClass"
-4="filedialog"
-5="isfile"
-6="buffer"
-7="About"
-8="lstrcmp"
-9="GetStruct"
-10="InitializeUnpacker"
+1="refreshcom"
+2="refresh"
+3="hcombo"
+4="populate"
+5="loadplugins"
+6="invoke Loadplugin"
+7="loadplugin"
+8="search"
+9="invoke lstrlen"
+10="_lpitem"
