@@ -1,8 +1,10 @@
 include windows.inc
 include kernel32.inc
 include user32.inc
+include comdlg32.inc
 include SDK.inc
 
+includelib comdlg32.lib
 includelib kernel32.lib
 includelib user32.lib
 includelib TitanEngine_x86.lib
@@ -22,6 +24,15 @@ SnapShoot1CallBack PROTO
 MapFileEx PROTO :DWORD,:DWORD,:DWORD,:DWORD,:DWORD,:DWORD
 UnmapFileEx PROTO :DWORD,:DWORD,:DWORD,:DWORD
 GetUnpackerFolder PROTO
+GetSaveDialog PROTO
+
+chr$ MACRO any_text:VARARG
+LOCAL txtname
+.data
+  txtname db any_text,0
+.code
+EXITM <OFFSET txtname>
+ENDM
 
 KillSehFrame MACRO
 	POP  FS:[0]
@@ -46,6 +57,10 @@ DLL_RET_MSG struct
 	dRetExVal		dd 0
 	dFlags			dd 0
 DLL_RET_MSG ends
+
+.const
+FilterString db "All Files",0,"*.*",0h,0h
+FUUID db "FUU1",0
 
 .data
 
@@ -113,6 +128,7 @@ MySection db ".Imports",0
 IATFixedMsg db 'IAT Fixed',0
 ExportRelocationMsg db 'Exporting Relocations',0
 RealignPEMsg db 'PE Realigned',0
+NoOverlayDetected db 'No Overlay Data Detected!',0
 RelocationChangeBaseMsg db 'Rebase File Image',0
 CopyOverlayMsg db 'Copying overlay data to unpacked file',0 
 UnpackProcessDoneMsg db 'Done. File Unpacked',0
@@ -123,12 +139,14 @@ UnpackedFileNameFormat db '%s.unpacked.%s',0
 szSnapShoot1Name db "snap.1",0
 szSnapShoot2Name db "snap.2",0
 hControl dd 0
+FileSaveFlag db 0
 
 .data?
 cbInitCallBack dd ?
 LoadedBaseAddress dd ?
 _IsFileDll db ?
 RealignPEFlag dd ?
+CopyOverlayDataFlag dd ?
 ImageBase dd ?
 EntryPoint dd ?
 SizeOfImage dd ?
@@ -145,3 +163,5 @@ UnpackedFileNameBuffer db 1024 dup(?)
 SnapShoot1 db 1024 dup(?)
 SnapShoot2 db 1024 dup(?)
 UnpackerFolder db 1024 dup(?)
+GlobalBuffer db 1024 dup(?)
+ofn OPENFILENAME <?>

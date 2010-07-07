@@ -1,24 +1,37 @@
-;   UPX Unpacker for UPX 1.x - 3.x
-;
-;   Copyright (C) 2010 ReversingLabs www.reversinglabs.com
-;
-; 	This library is free software: you can redistribute it and/or
-; 	modify it under the terms of the GNU Lesser General Public
-; 	License as published by the Free Software Foundation, either
-; 	version 3 of the License, or any later version.
-; 
-; 	This library is distributed in the hope that it will be useful,
-; 	but WITHOUT ANY WARRANTY; without even the implied warranty of
-; 	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-; 	Lesser General Public License for more details.
-; 
-; 	You should have received a copy of the GNU Lesser General Public
-; 	License along with this library.  If not, see <http://www.gnu.org/licenses/>.
+comment ~
+   UPX Unpacker for UPX 1.x - 3.x
+
+   Copyright (C) 2010 ReversingLabs www.reversinglabs.com
+
+ 	This library is free software: you can redistribute it and/or
+ 	modify it under the terms of the GNU Lesser General Public
+ 	License as published by the Free Software Foundation, either
+ 	version 3 of the License, or any later version.
+ 
+ 	This library is distributed in the hope that it will be useful,
+ 	but WITHOUT ANY WARRANTY; without even the implied warranty of
+ 	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ 	Lesser General Public License for more details.
+ 
+ 	You should have received a copy of the GNU Lesser General Public
+ 	License along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
 
-;
-;	Modified version by +NCR/CRC! [ReVeRsEr]
-;
+
+	---------------------------------------------
+	Modified version by +NCR/CRC! [ReVeRsEr]
+	---------------------------------------------
+
+[Supported Versions]
+* UPX 1.x - 3.x
+
+[Changelog]
+* First stable version
+
+[Known Limitations]
+* It has some problems with file packed with UPX 1.24
+
+~
 
 .586
 .model flat, stdcall
@@ -29,23 +42,61 @@ include upx_unpacker.inc
 .code
 
 LibMain proc hInstDLL:DWORD, reason:DWORD, unused:DWORD
+	comment ~
+	Function Name: LibMain
+	Function Description: The main function of the dll 
+	Function Parameters:
+		hInstDLL: DWORD
+		reason: DWORD
+		unused: DWORD
+	~
+
 	mov eax, TRUE	
 	ret
 LibMain endp
 
 GetPluginName proc
+	comment ~
+	Function Name: GetPluginName
+	Function Description: Returns the plugin's name 
+	Function Parameters: None
+	~
 	
 	mov eax, offset PluginName
 	ret
 
 GetPluginName endp
 
-DoUnpack proc hMainDlg:DWORD, szFname:DWORD, lpReserved:DWORD, lpParam:DWORD
+DoUnpack proc hMainDlg:DWORD, szFname:DWORD, lpOptionsArray:DWORD, lpReserved:DWORD, lpParam:DWORD
+	comment ~
+	Function Name: DoUnpack
+	Function Description: This function is a wrapper for _DoUnpack. This function makes an init() to 
+							initialize all the variables and data structures needed by the dll. 
+	Function Parameters:
+		hMainDlg: DWORD
+		szFname: DWORD
+		lpOptionsArray: DWORD
+		lpReserved: DWORD
+		lpParam: DWORD
+	~
 	
-	mov ebx, lpParam
+	mov eax, dword ptr[lpReserved]
+	invoke lstrcmp, eax, addr FUUID
+	.if eax != 0
+		invoke MessageBox, hMainDlg, chr$("IDERROR: This is not a FUU plugin :/"), chr$("ERROR!!!"), MB_ICONERROR
+		ret 
+	.endif
+	
+	mov edi, lpOptionsArray
+	mov eax, dword ptr[edi]
+	mov ebx, dword ptr[edi+4]
+	
+	mov eax, dword ptr[eax]
 	mov ebx, dword ptr[ebx]
-	mov RealignPEFlag, ebx
-		
+	
+	mov RealignPEFlag, eax
+	mov CopyOverlayDataFlag, ebx
+	
 	mov eax, szFname
 	invoke lstrlen, eax
 	inc eax
@@ -57,18 +108,26 @@ DoUnpack proc hMainDlg:DWORD, szFname:DWORD, lpReserved:DWORD, lpParam:DWORD
 	
 	invoke GetUnpackerFolder
 	
-	;invoke SendMessage, hControl, LB_RESETCONTENT, NULL, NULL
-	
 	invoke LogMessage, addr StartMsg
 	invoke LogMessage, addr StartUnpackProcessMsg
-	;ret 
+	
 	invoke _DoUnpack, hMainDlg, szFname, cbFindPatterns, lpReserved, lpParam
 	ret
-
+	
 DoUnpack endp
 
 _DoUnpack proc hMainDlg:DWORD, szFname:DWORD, dwCallBack:DWORD, lpReserved:DWORD, lpParam:DWORD
-
+	comment ~
+	Function Name: _DoUnpack
+	Function Description: Makes the unpack things :). This function initialize the debug loop. 
+	Function Parameters:
+		hMainDlg: DWORD
+		szFname: DWORD
+		dwCallBack: DWORD
+		lpReserved: DWORD
+		lpParam: DWORD
+	~
+	
 	pushad	
 	mov eax, szFname
 	.if eax != NULL && byte ptr[eax] != NULL
@@ -90,7 +149,7 @@ _DoUnpack proc hMainDlg:DWORD, szFname:DWORD, dwCallBack:DWORD, lpReserved:DWORD
 			sub eax, SnapshootMemoryStartRVA
 			mov SnapShootMemorySize, eax
 			
-			invoke BuildUnpackedFileName, szFname
+			;invoke BuildUnpackedFileName, szFname
 			
 			invoke IsFileDLL, szFname, NULL
 			mov _IsFileDll, al
@@ -105,6 +164,8 @@ _DoUnpack proc hMainDlg:DWORD, szFname:DWORD, dwCallBack:DWORD, lpReserved:DWORD
 				invoke lstrcat, addr SnapShoot2, addr szSnapShoot2Name
 				
 				invoke InitDLLDebug, szFname, 1, NULL, NULL, addr cbFindPatterns
+				invoke DeleteFile, addr SnapShoot1
+				invoke DeleteFile, addr SnapShoot2
 			.else
 				xor eax, eax
 			.endif
@@ -136,7 +197,37 @@ _DoUnpack proc hMainDlg:DWORD, szFname:DWORD, dwCallBack:DWORD, lpReserved:DWORD
 
 _DoUnpack endp
 
+GetSaveDialog proc
+	comment ~
+	Function Name: GetSaveDialog
+	Function Description: Create the Save File Dialog window 
+	Function Parameters: None
+	~
+	
+	pushad
+	mov ofn.lStructSize,sizeof ofn
+	mov ofn.lpstrFilter,offset FilterString
+	mov ofn.lpstrFile,offset GlobalBuffer
+	mov ofn.nMaxFile,1024
+	mov ofn.Flags, OFN_SHOWHELP or OFN_OVERWRITEPROMPT
+	mov ofn.lpstrTitle,offset StartMsg
+	invoke GetSaveFileName,addr ofn
+	.if eax != 0
+		mov FileSaveFlag, 1
+	.endif
+	popad
+	ret
+
+GetSaveDialog endp
+
 cbGetEP proc piPtr:DWORD
+	comment ~
+	Function Name: cbGetEP
+	Function Description: This callback initialize the importer and returns the loaded base address. 
+	Function Parameters:
+		piPtr: DWORD
+	~
+
 	pushad
 	mov eax, piPtr
 	assume eax:ptr CREATE_PROCESS_DEBUG_INFO
@@ -153,7 +244,13 @@ cbGetEP proc piPtr:DWORD
 cbGetEP endp
 
 GetControlHandle proc hWin:HWND
-	
+	comment ~
+	Function Name: GetControlHandle
+	Function Description: Returns the handle of the main window.
+	Function Parameters:
+		hWin: DWORD
+	~
+
 	invoke FindWindowEx, hWin, NULL, offset ListBoxClassName, NULL
 	.if eax != NULL
 		mov hControl, eax
@@ -163,7 +260,13 @@ GetControlHandle proc hWin:HWND
 GetControlHandle endp
 
 LogMessage proc LogMsg:DWORD
-	
+	comment ~
+	Function Name: LogMessage
+	Function Description: Function lo log all what happens during the unpack process.
+	Function Parameters:
+		LogMsg: DWORD
+	~
+
 	pushad
 	invoke SendMessage, hControl, LB_ADDSTRING, NULL, LogMsg
 	invoke SendMessage, hControl, LB_GETCOUNT, NULL, NULL
@@ -175,6 +278,12 @@ LogMessage proc LogMsg:DWORD
 LogMessage endp
 
 GetUnpackerFolder proc
+	comment ~
+	Function Name: GetUnpackFolder
+	Function Description: Retuns the full path of the current folder where FUU is running.
+	Function Parameters: None
+	~
+
 	pushad
 	invoke GetModuleHandle, NULL
 	
@@ -191,6 +300,7 @@ GetUnpackerFolder proc
 
 GetUnpackerFolder endp
 
+comment ~
 BuildUnpackedFileName proc szPathFileName:DWORD
 	
 	pushad
@@ -220,8 +330,17 @@ BuildUnpackedFileName proc szPathFileName:DWORD
 	ret
 
 BuildUnpackedFileName endp
+~
 
 cbFindPatterns proc
+	comment ~
+	Function Name: cbFindPatterns
+	Function Description: This function check for a given pattern in the runnning process.
+							It is used to check if the given .exe or .dll is packed with the
+							packer you selected.
+	Function Parameters: None
+	~
+
 	LOCAL MemInfo: MEMORY_BASIC_INFORMATION
 	LOCAL Flag: DWORD
 	
@@ -335,6 +454,13 @@ cbFindPatterns proc
 cbFindPatterns endp
 
 LoadLibraryCallBack proc
+	comment ~
+	Function Name: LoadLibraryCallBack
+	Function Description: This is the callback where the plugin gets the libraries imported
+							by the packed program in order to re-build the IAT later on.
+	Function Parameters: None
+	~
+	
 	LOCAL MemInfo: MEMORY_BASIC_INFORMATION
 	LOCAL NumberOfBytes: DWORD
 	
@@ -376,6 +502,13 @@ LoadLibraryCallBack proc
 LoadLibraryCallBack endp
 
 GetProcAddressCallBack proc
+	comment ~
+	Function Name: GetProcAddressCallBack
+	Function Description: This function gets all the imported APIs used by the packed program
+							in order to re-build the IAT later on.
+	Function Parameters: None
+	~
+	
 	LOCAL MemInfo: MEMORY_BASIC_INFORMATION
 	LOCAL NumberOfBytes: DWORD
 	
@@ -441,6 +574,14 @@ GetProcAddressCallBack proc
 GetProcAddressCallBack endp
 
 EntryPointCallBack proc
+	comment ~
+	Function Name: EntryPointCallBack
+	Function Description: This function is in charge of dump the process, relign the PE, copies
+							the overlay data (if it is present) and does many other things related
+							to re-build the binary to its original state.
+	Function Parameters: None
+	~
+	
 	LOCAL UnpackedOEP :DWORD
 	LOCAL FileHandle :DWORD
 	LOCAL FileSize :DWORD
@@ -480,73 +621,90 @@ EntryPointCallBack proc
 		invoke RelocaterCompareTwoSnapshots, dword ptr[ProcessInfo.hProcess], LoadedBaseAddress, SizeOfImage, addr SnapShoot1, addr SnapShoot2, esi
 	.endif
 	
-	invoke DumpProcess, dword ptr[ProcessInfo.hProcess], LoadedBaseAddress, addr UnpackedFileNameBuffer, UnpackedOEP
-	invoke LogMessage, addr DumpMsg
+	invoke GetSaveDialog
+	.if FileSaveFlag == 1
 	
-	invoke StopDebug
-	invoke ImporterEstimatedSize
-	lea ebx, dword ptr[eax+200]
-	invoke AddNewSection, addr UnpackedFileNameBuffer, addr MySection, ebx
-	add eax, LoadedBaseAddress
-	mov ebx, eax
-	
-	.if _IsFileDll == 1
-		invoke RelocaterEstimatedSize
-		lea ecx, dword ptr[eax+200]
-		invoke AddNewSection, addr UnpackedFileNameBuffer, addr MySection, ecx
-		mov edi, eax
-		mov esi, eax
-	.endif
-	
-	invoke MapFileEx, addr UnpackedFileNameBuffer, NULL, addr FileHandle, addr FileSize, addr FileMap, addr FileMapVA
-	.if FileMapVA > NULL 
-		invoke ConvertVAtoFileOffset, FileMapVA, ebx, 1
+		;invoke DumpProcess, dword ptr[ProcessInfo.hProcess], LoadedBaseAddress, addr UnpackedFileNameBuffer, UnpackedOEP
+		invoke DumpProcess, dword ptr[ProcessInfo.hProcess], LoadedBaseAddress, addr GlobalBuffer, UnpackedOEP
+		invoke LogMessage, addr DumpMsg
+		
+		invoke StopDebug
+		invoke ImporterEstimatedSize
+		lea ebx, dword ptr[eax+200]
+		;invoke AddNewSection, addr UnpackedFileNameBuffer, addr MySection, ebx
+		invoke AddNewSection, addr GlobalBuffer, addr MySection, ebx
+		add eax, LoadedBaseAddress
 		mov ebx, eax
 		
-		invoke ImporterExportIAT, ebx, FileMapVA
-		invoke LogMessage, addr IATFixedMsg
-		
 		.if _IsFileDll == 1
-			add esi, FileMapVA
-			invoke RelocaterExportRelocation, esi, edi, FileMapVA
-			invoke LogMessage, addr ExportRelocationMsg
-		.endif	
-		.if RealignPEFlag == TRUE
-			invoke RealignPE, FileMapVA, FileSize, 2
-			mov FileSize, eax
-			invoke LogMessage, addr RealignPEMsg
+			invoke RelocaterEstimatedSize
+			lea ecx, dword ptr[eax+200]
+			;invoke AddNewSection, addr UnpackedFileNameBuffer, addr MySection, ecx
+			invoke AddNewSection, addr GlobalBuffer, addr MySection, ecx
+			mov edi, eax
+			mov esi, eax
 		.endif
 		
-		invoke UnmapFileEx, FileHandle, FileSize, FileMap, FileMapVA
-		invoke MakeAllSectionsRWE, addr UnpackedFileNameBuffer
-		
-		.if _IsFileDll == 1
-			invoke RelocaterChangeFileBase, addr UnpackedFileNameBuffer, ImageBase
-			invoke LogMessage, addr RelocationChangeBaseMsg
-		.endif
-		
-		invoke FindOverlay, addr TempBuffer, addr OverlayStart, addr OverlaySize
-		.if eax == 1
-			invoke CopyOverlay, addr TempBuffer, addr UnpackedFileNameBuffer
-			invoke LogMessage, addr CopyOverlayMsg
-		.endif
-		
-		invoke LogMessage, addr UnpackProcessDoneMsg
-		
-		KillSehFrame
-	.else
-		__MAJOR_DEBUG_ERROR_EXIT:
-		KillSehFrame
-		invoke ForceClose
-		invoke ImporterCleanup
-		
-		.if FileMapVA > NULL
+		;invoke MapFileEx, addr UnpackedFileNameBuffer, NULL, addr FileHandle, addr FileSize, addr FileMap, addr FileMapVA
+		invoke MapFileEx, addr GlobalBuffer, NULL, addr FileHandle, addr FileSize, addr FileMap, addr FileMapVA
+		.if FileMapVA > NULL 
+			invoke ConvertVAtoFileOffset, FileMapVA, ebx, 1
+			mov ebx, eax
+			
+			invoke ImporterExportIAT, ebx, FileMapVA
+			invoke LogMessage, addr IATFixedMsg
+			
+			.if _IsFileDll == 1
+				add esi, FileMapVA
+				invoke RelocaterExportRelocation, esi, edi, FileMapVA
+				invoke LogMessage, addr ExportRelocationMsg
+			.endif
+			
+			.if RealignPEFlag == TRUE
+				invoke RealignPE, FileMapVA, FileSize, 2
+				mov FileSize, eax
+				invoke LogMessage, addr RealignPEMsg
+			.endif
+			
 			invoke UnmapFileEx, FileHandle, FileSize, FileMap, FileMapVA
+			;invoke MakeAllSectionsRWE, addr UnpackedFileNameBuffer
+			invoke MakeAllSectionsRWE, addr GlobalBuffer
+			
+			.if _IsFileDll == 1
+				;invoke RelocaterChangeFileBase, addr UnpackedFileNameBuffer, ImageBase
+				invoke RelocaterChangeFileBase, addr GlobalBuffer, ImageBase
+				invoke LogMessage, addr RelocationChangeBaseMsg
+			.endif
+			
+			.if CopyOverlayDataFlag == TRUE
+				invoke FindOverlay, addr TempBuffer, addr OverlayStart, addr OverlaySize
+				.if eax == 1
+					;invoke CopyOverlay, addr TempBuffer, addr UnpackedFileNameBuffer
+					invoke CopyOverlay, addr TempBuffer, addr GlobalBuffer
+					invoke LogMessage, addr CopyOverlayMsg
+				.else
+					invoke LogMessage, addr NoOverlayDetected
+				.endif
+			.endif
+			
+			invoke LogMessage, addr UnpackProcessDoneMsg
+			
+			KillSehFrame
+		.else
+			__MAJOR_DEBUG_ERROR_EXIT:
+			KillSehFrame
+			invoke ForceClose
+			invoke ImporterCleanup
+			
+			.if FileMapVA > NULL
+				invoke UnmapFileEx, FileHandle, FileSize, FileMap, FileMapVA
+			.endif
+			
+			;invoke DeleteFile, addr UnpackedFileNameBuffer
+			invoke DeleteFile, addr GlobalBuffer
+			invoke LogMessage, addr FatalErrorMsg
+			invoke LogMessage, addr EndUnpackMsg
 		.endif
-		
-		invoke DeleteFile, addr UnpackedFileNameBuffer
-		invoke LogMessage, addr FatalErrorMsg
-		invoke LogMessage, addr EndUnpackMsg
 	.endif 
 	popad
 	ret
@@ -554,6 +712,12 @@ EntryPointCallBack proc
 EntryPointCallBack endp
 
 SnapShoot1CallBack proc
+	comment ~
+	Function Name: SnapShoot1CallBack
+	Function Description: This function takes a snapshoot of the running process.
+	Function Parameters: None
+	~
+	
 	pushad
 	
 	mov esi,SnapshootMemoryStartRVA
@@ -566,7 +730,16 @@ SnapShoot1CallBack proc
 SnapShoot1CallBack endp
 
 SehHandler proc C Except:DWORD,Frame:DWORD,Context:DWORD,Dispatch:DWORD
-
+	comment ~
+	Function Name: SehHandler
+	Function Description: This function sets an exception handler.
+	Function Parameters:
+		Except: DWORD
+		Frame: DWORD
+		Context: DWORD
+		Dispatch: DWORD
+	~
+	
 	mov eax,Context
 	assume eax:ptr CONTEXT
 		push MAJOR_DEBUG_ERROR_EXIT
@@ -581,6 +754,18 @@ SehHandler proc C Except:DWORD,Frame:DWORD,Context:DWORD,Dispatch:DWORD
 SehHandler endp
 
 MapFileEx proc fName:DWORD,ReadOrWrite:DWORD,FileHandle:DWORD,FileSize:DWORD,FileMap:DWORD,FileMapVA:DWORD
+	comment ~
+	Function Name: MapFileEx
+	Function Description: This function creates a map file of a given file.
+	Function Parameters:
+		fName: DWORD
+		ReadOrWrite: DWORD
+		FileHandle: DWORD
+		FileSize: DWORD
+		FileMap: DWORD
+		FileMapVA: DWORD
+	~
+	
 	LOCAL Return :DWORD
 	pushad
 	mov Return,0
@@ -611,6 +796,16 @@ MapFileEx proc fName:DWORD,ReadOrWrite:DWORD,FileHandle:DWORD,FileSize:DWORD,Fil
 MapFileEx endp
 
 UnmapFileEx proc FileHandle:DWORD,FileSize:DWORD,FileMap:DWORD,FileMapVA:DWORD
+	comment ~
+	Function Name: UnmapFileEx
+	Function Description: This function erase the map file created by MapFileEx
+	Function Parameters:
+		FileHandle: DWORD
+		FileSize: DWORD
+		FileMap: DWORD
+		FileMapVA: DWORD
+	~
+	
 	pushad
 	invoke UnmapViewOfFile,FileMapVA
 	invoke CloseHandle,FileMap
