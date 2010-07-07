@@ -1,13 +1,13 @@
 #summary Changelog up to version 0.1 Beta
 #labels Featured
 
-== Plugins ==
+=== Plugins ===
 
   * UPX Unpacker for UPX v1.x - 3.x (DLL and EXE - x86)
   * BeRoExEPacker Unpacker (EXE - x86)
   * FSG Unpacker for v1.x - 2.x (EXE - x86)
 
-== Tools ==
+=== Tools ===
 
   * Generic OEP Finder (GenOEP.dll)
   * Crytp Signatures Detector (kanal.dll)
