@@ -1,0 +1,3 @@
+LIBRARY ; Exported functions
+EXPORTS GetPluginName ; Returns the plugin's name
+EXPORTS DoUnpack ; Does the magic!
