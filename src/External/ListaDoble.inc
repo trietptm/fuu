@@ -29,9 +29,9 @@ OrdenarListaDoble 				proto :DWORD,:DWORD,:DWORD
 
 .data
 
-szErrorFicheroExiste		db "Error el fichero existe",0
-szErrorFicheroNotOPen		db "El fichero no se pude crear",0
-szErrorReservandoMemoria	db "Error reservando memoria",0
+szErrorFicheroExiste		db "Error. The File exists",0
+szErrorFicheroNotOPen		db "It's not possible to create the file",0
+szErrorReservandoMemoria	db "Error allocating memory",0
 
 .code
 
