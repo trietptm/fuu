@@ -1,3 +1,5 @@
+; $Id$
+
 comment ~
  ASPack Unpacker for ASPack 2.x - LGPL 3.0
 
