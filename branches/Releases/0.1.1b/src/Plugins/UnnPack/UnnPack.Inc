@@ -1,3 +1,5 @@
+; $Id$
+
 include kernel32.inc
 include user32.inc
 include comdlg32.inc
