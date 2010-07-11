@@ -1,3 +1,5 @@
+; $Id$
+
 comment ~
 	UndePack for dePack - LGPL 3.0
 	
