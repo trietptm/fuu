@@ -1,3 +1,5 @@
+; $Id$
+
 comment ~
  BeRoExeUnpacker for BeRoExePacker v1.0 - LGPL 3.0
 
