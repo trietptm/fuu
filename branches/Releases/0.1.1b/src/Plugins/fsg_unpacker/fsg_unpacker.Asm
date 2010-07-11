@@ -1,3 +1,5 @@
+; $Id$
+
 comment ~
  FSG Unpacker for FSG F[ast] S[mall] G[ood] - LGPL 3.0
 
