@@ -1,3 +1,5 @@
+; $Id$
+
 include windows.inc
 include comdlg32.inc
 include kernel32.inc
