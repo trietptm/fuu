@@ -1,6 +1,6 @@
 == Grep String Plugin by Zapper ==
 
- * PlugIn:  "GrepString".
+ * Plugin:  GrepString.
  * Version: 1.0 Beta.
  * Status:  Estable.
  * Fecha:   24 de Juillo del 2010.
