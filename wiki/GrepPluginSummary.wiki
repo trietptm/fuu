@@ -1,3 +1,5 @@
+#summary GrepString 1.0
+
 == Grep String Plugin by Zapper ==
 
  * Plugin:  GrepString.
